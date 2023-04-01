@@ -1,6 +1,8 @@
+import { useRouter } from 'next/router';
+import { Groq } from 'next-sanity';
 import React, { useState } from 'react';
+import ErrorPage from 'next/error';
 import { AiOutlineMinus, AiOutlinePlus, AiFillStar, AiOutlineStar } from 'react-icons/ai';
-
 import { client, urlFor } from '../../lib/client';
 import { Product } from '../../components';
 import { useStateContext } from '../../context/StateContext';
@@ -9,6 +11,18 @@ const ProductDetails = ({ product, products }) => {
   const { image, name, details, price } = product;
   const [index, setIndex] = useState(0);
   const { decQty, incQty, qty, onAdd, setShowCart } = useStateContext();
+  const router = useRouter();
+
+  if (!product) {
+    return (
+      <ErrorPage
+        statusCode={404}
+        title="Le produit que vous cherchez n'est pas disponible."
+      />
+    );
+  }
+
+
 
   const handleBuyNow = () => {
     onAdd(product, qty);
@@ -82,39 +96,34 @@ const ProductDetails = ({ product, products }) => {
 }
 
 export const getStaticPaths = async () => {
-  const query = `*[_type == "product"] {
+  const query = Groq`*[_type == "product"] {
     slug {
       current
     }
-  }
-  `;
+  }`;
 
   const products = await client.fetch(query);
 
   const paths = products.map((product) => ({
-    params: { 
-      slug: product.slug.current
-    }
+    params: {
+      slug: product.slug.current,
+    },
   }));
 
   return {
     paths,
-    fallback: 'blocking'
-  }
-}
+    fallback: 'blocking',
+  };
+};
 
-export const getStaticProps = async ({ params: { slug }}) => {
-  const query = `*[_type == "product" && slug.current == '${slug}'][0]`;
-  const productsQuery = '*[_type == "product"]'
-  
-  const product = await client.fetch(query);
+export const getStaticProps = async ({ params: { slug } }) => {
+  const query = Groq`*[_type == "product" && slug.current == $slug][0]`;
+  const productsQuery = Groq`*[_type == "product"]`;
+
+  const product = await client.fetch(query, { slug });
   const products = await client.fetch(productsQuery);
 
-  console.log(product);
-
   return {
-    props: { products, product }
-  }
-}
-
-export default ProductDetails
+    props: { products, product },
+  };
+};
